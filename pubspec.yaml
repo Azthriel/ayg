@@ -1,0 +1,71 @@
+name: ayg
+description: "Agua y Gas"
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Date handling
+  intl: any
+
+  # WhatsApp integration
+  url_launcher: ^6.2.2
+
+  # State management
+  provider: ^6.1.1
+
+  # Firebase/Firestore
+  firebase_core: ^4.0.0
+  cloud_firestore: ^6.0.0
+  crypto: ^3.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+  icons_launcher: ^2.1.7
+
+flutter:
+  uses-material-design: true
+
+  # Assets
+  assets:
+    - assets/logo.png
+
+# Configuración de Icons Launcher
+icons_launcher:
+  image_path: "assets/logo.png"
+  platforms:
+    android:
+      enable: false
+      image_path: "assets/logo.png"
+      adaptive_foreground_image: "assets/logo.png"
+      adaptive_background_color: "#ffffff"
+    ios:
+      enable: false
+      image_path: "assets/logo.png"
+    web:
+      enable: true
+      image_path: "assets/logo.png"
+      favicon_path: "assets/logo.png"
+    windows:
+      enable: false
+      image_path: "assets/logo.png"
+    macos:
+      enable: false
+      image_path: "assets/logo.png"
+    linux:
+      enable: false
+      image_path: "assets/logo.png"
+
+# Configuración específica para Web
+platforms:
+  web:
