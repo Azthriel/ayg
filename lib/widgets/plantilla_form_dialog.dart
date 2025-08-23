@@ -231,6 +231,8 @@ class _PlantillaFormDialogState extends State<PlantillaFormDialog> {
                       // Tipo de mensaje
                       DropdownButtonFormField<TipoMensaje>(
                         value: _tipoSeleccionado,
+                        isExpanded: true,
+                        isDense: true,
                         decoration: const InputDecoration(
                           labelText: 'Tipo de Mensaje *',
                           border: OutlineInputBorder(),
@@ -246,7 +248,12 @@ class _PlantillaFormDialogState extends State<PlantillaFormDialog> {
                                   size: 20,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(tipo.descripcion),
+                                Flexible(
+                                  child: Text(
+                                    tipo.descripcion,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ],
                             ),
                           );

@@ -327,44 +327,53 @@ class DashboardTab extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Estadísticas principales
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                childAspectRatio: 1.5,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  DashboardCard(
-                    title: 'Total Clientes',
-                    value: provider.totalClientes.toString(),
-                    icon: Icons.people,
-                    color: Colors.blue,
-                    onTap: () => _navigateToTab(context, 1),
-                  ),
-                  DashboardCard(
-                    title: 'Clientes Activos',
-                    value: provider.clientesActivos.toString(),
-                    icon: Icons.person,
-                    color: Colors.green,
-                    onTap: () => _navigateToTab(context, 1),
-                  ),
-                  DashboardCard(
-                    title: 'Cuotas Vencidas',
-                    value: provider.cuotasVencidas.length.toString(),
-                    icon: Icons.warning,
-                    color: Colors.red,
-                    onTap: () => _navigateToTab(context, 2),
-                  ),
-                  DashboardCard(
-                    title: 'Próximos Vencimientos',
-                    value: provider.cuotasProximas.length.toString(),
-                    icon: Icons.schedule,
-                    color: Colors.orange,
-                    onTap: () => _navigateToTab(context, 2),
-                  ),
-                ],
+              // Estadísticas principales — Grid responsive para evitar overflow en pantallas pequeñas
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  // En pantallas muy angostas usar 1 columna, en pantallas pequeñas 2
+                  final double maxWidth = constraints.maxWidth;
+                  final int crossAxisCount = maxWidth < 480 ? 1 : 2;
+                  final double childAspectRatio = maxWidth < 480 ? 3.2 : 1.5;
+
+                  return GridView.count(
+                    crossAxisCount: crossAxisCount,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    childAspectRatio: childAspectRatio,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    children: [
+                      DashboardCard(
+                        title: 'Total Clientes',
+                        value: provider.totalClientes.toString(),
+                        icon: Icons.people,
+                        color: Colors.blue,
+                        onTap: () => _navigateToTab(context, 1),
+                      ),
+                      DashboardCard(
+                        title: 'Clientes Activos',
+                        value: provider.clientesActivos.toString(),
+                        icon: Icons.person,
+                        color: Colors.green,
+                        onTap: () => _navigateToTab(context, 1),
+                      ),
+                      DashboardCard(
+                        title: 'Cuotas Vencidas',
+                        value: provider.cuotasVencidas.length.toString(),
+                        icon: Icons.warning,
+                        color: Colors.red,
+                        onTap: () => _navigateToTab(context, 2),
+                      ),
+                      DashboardCard(
+                        title: 'Próximos Vencimientos',
+                        value: provider.cuotasProximas.length.toString(),
+                        icon: Icons.schedule,
+                        color: Colors.orange,
+                        onTap: () => _navigateToTab(context, 2),
+                      ),
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: 24),

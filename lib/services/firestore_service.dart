@@ -504,14 +504,19 @@ class FirestoreService {
   /// Obtiene todas las plantillas activas
   Future<List<PlantillaMensaje>> getPlantillas() async {
     try {
+      // NOTE: field name must match what we write in toFirestore() -> 'activa'
       final querySnapshot = await _plantillasCollection
-          .where('activo', isEqualTo: true)
-          .orderBy('nombre')
+          .where('activa', isEqualTo: true)
           .get();
-      return querySnapshot.docs.map((doc) {
+
+      final plantillas = querySnapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         return PlantillaMensaje.fromFirestore(data, doc.id);
       }).toList();
+
+      // Ordenar localmente por nombre para evitar requerir índice compuesto
+      plantillas.sort((a, b) => a.nombre.compareTo(b.nombre));
+      return plantillas;
     } catch (e) {
       print('Error obteniendo plantillas: $e');
       return [];
@@ -520,8 +525,9 @@ class FirestoreService {
 
   /// Obtiene un stream de plantillas
   Stream<List<PlantillaMensaje>> getPlantillasStream() {
+    // NOTE: use 'activa' field (consistent with toFirestore())
     return _plantillasCollection
-        .where('activo', isEqualTo: true)
+        .where('activa', isEqualTo: true)
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) {
@@ -601,7 +607,8 @@ class FirestoreService {
   /// Elimina una plantilla (soft delete - marca como inactiva)
   Future<bool> deletePlantilla(String plantillaId) async {
     try {
-      await _plantillasCollection.doc(plantillaId).update({'activo': false});
+      // Soft delete: marcar como inactiva usando la clave 'activa'
+      await _plantillasCollection.doc(plantillaId).update({'activa': false});
       print('✅ Plantilla marcada como inactiva (soft delete): $plantillaId');
       return true;
     } catch (e) {
@@ -626,9 +633,13 @@ class FirestoreService {
   Future<void> inicializarPlantillasPorDefecto() async {
     try {
       print('🔧 WhatsApp Template - Verificando plantillas existentes...');
+
+      // Primero migrar documentos antiguos que usen 'activo' a la clave nueva 'activa'
+      await migratePlantillasActivoToActiva();
+
       final plantillasExistentes = await getPlantillas();
       print(
-        '📊 WhatsApp Template - Plantillas encontradas: ${plantillasExistentes.length}',
+        '📊 WhatsApp Template - Plantillas encontradas (activas): ${plantillasExistentes.length}',
       );
 
       if (plantillasExistentes.isEmpty) {
@@ -692,6 +703,138 @@ class FirestoreService {
       }
     } catch (e) {
       print('💥 Error inicializando plantillas por defecto: $e');
+    }
+  }
+
+  /// Elimina plantillas duplicadas en Firestore agrupando por (tipo + nombre).
+  /// Mantiene la plantilla con la fecha de creación más antigua (si existe) o la primera.
+  Future<Map<String, int>> deduplicatePlantillas() async {
+    try {
+      print('🔎 WhatsApp Template - Iniciando deduplicación de plantillas...');
+      final snapshot = await _plantillasCollection.get();
+      final docs = snapshot.docs;
+
+      // Agrupar por tipo|nombre
+      final Map<String, List<QueryDocumentSnapshot>> groups = {};
+      for (var doc in docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final tipo = (data['tipo'] ?? '').toString();
+        final nombre = (data['nombre'] ?? '').toString();
+        final key = '$tipo||$nombre';
+        groups.putIfAbsent(key, () => []).add(doc);
+      }
+
+      int deleted = 0;
+      for (var entry in groups.entries) {
+        final items = entry.value;
+        if (items.length <= 1) continue;
+
+        // Ordenar por fechaCreacion ascendente si existe
+        items.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTs = aData['fechaCreacion'];
+          final bTs = bData['fechaCreacion'];
+          if (aTs is Timestamp && bTs is Timestamp) {
+            return aTs.compareTo(bTs);
+          }
+          return 0;
+        });
+
+        // Mantener el primero, eliminar el resto en batch
+        final batch = _firestore.batch();
+        for (int i = 1; i < items.length; i++) {
+          batch.delete(items[i].reference);
+          deleted++;
+        }
+        await batch.commit();
+        print(
+          '🗑️ WhatsApp Template - Eliminados ${items.length - 1} duplicados para ${entry.key}',
+        );
+      }
+
+      print(
+        '✅ WhatsApp Template - Deduplicación completada. Eliminados: $deleted',
+      );
+      return {'deleted': deleted};
+    } catch (e) {
+      print('💥 Error deduplicando plantillas: $e');
+      return {'deleted': 0};
+    }
+  }
+
+  /// Elimina completamente todos los documentos de la colección 'plantillas'.
+  /// Ejecuta borrado por batches para respetar límites de Firestore.
+  Future<int> deleteAllPlantillas() async {
+    try {
+      print(
+        '🗑️ WhatsApp Template - Iniciando borrado completo de plantillas...',
+      );
+      int totalDeleted = 0;
+
+      // Obtener todos los documentos
+      QuerySnapshot snapshot = await _plantillasCollection.get();
+      while (snapshot.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        final docsToDelete = snapshot.docs.take(500).toList();
+        for (var doc in docsToDelete) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+        totalDeleted += docsToDelete.length;
+
+        // Obtener siguiente lote
+        snapshot = await _plantillasCollection.get();
+      }
+
+      print(
+        '✅ WhatsApp Template - Borrado completado. Total eliminados: $totalDeleted',
+      );
+      return totalDeleted;
+    } catch (e) {
+      print('💥 Error borrando todas las plantillas: $e');
+      return 0;
+    }
+  }
+
+  /// Migra documentos antiguos que usan la clave 'activo' a la nueva clave 'activa'
+  /// Devuelve un mapa con conteo de documentos actualizados.
+  Future<Map<String, int>> migratePlantillasActivoToActiva() async {
+    try {
+      print(
+        '🔁 WhatsApp Template - Buscando plantillas con campo antiguo "activo"...',
+      );
+      final snapshot = await _plantillasCollection
+          .where('activo', isEqualTo: true)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        print(
+          '🔁 WhatsApp Template - No se encontraron documentos con "activo"',
+        );
+        return {'updated': 0};
+      }
+
+      final batch = _firestore.batch();
+      int updated = 0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        // Copiar valor de 'activo' a 'activa' y eliminar 'activo'
+        final activoVal = data['activo'];
+        batch.update(doc.reference, {
+          'activa': activoVal,
+          'activo': FieldValue.delete(),
+        });
+        updated++;
+      }
+      await batch.commit();
+      print(
+        '✅ WhatsApp Template - Migrados $updated documentos (activo -> activa)',
+      );
+      return {'updated': updated};
+    } catch (e) {
+      print('💥 Error migrando plantillas: $e');
+      return {'updated': 0};
     }
   }
 }
