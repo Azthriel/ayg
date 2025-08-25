@@ -6,6 +6,7 @@ import 'providers/cliente_provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 /// AYG - Sistema de Gestión de Clientes Web
 /// Aplicación web para enviar recordatorios de pago vía WhatsApp
@@ -53,11 +54,22 @@ class MyApp extends StatelessWidget {
               ),
             ),
             debugShowCheckedModeBanner: false,
+            // Localización en español
+            locale: const Locale('es'),
+            supportedLocales: const [
+              Locale('es'),
+              Locale('en'),
+            ],
+            localizationsDelegates: [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             // Navegación basada en autenticación
-            home: authProvider.isAuthenticated ? const HomeScreen() : const LoginScreen(),
+            initialRoute: authProvider.isAuthenticated ? '/home' : '/login',
             routes: {
               '/login': (context) => const LoginScreen(),
-              '/home': (context) => const HomeScreen(),
+              '/home': (context) => authProvider.isAuthenticated ? const HomeScreen() : const LoginScreen(),
             },
           );
         },

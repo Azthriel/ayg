@@ -3,6 +3,40 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
 class Usuario {
+  // Serialización para persistencia web
+  Map<String, dynamic> toJson() {
+    return {
+      'firestoreId': firestoreId,
+      'usuario': usuario,
+      'passwordHash': passwordHash,
+      'nombre': nombre,
+      'email': email,
+      'tipo': tipo.name,
+      'activo': activo,
+      'fechaCreacion': fechaCreacion.toIso8601String(),
+      'ultimoAcceso': ultimoAcceso?.toIso8601String(),
+    };
+  }
+
+  static Usuario fromJson(dynamic json) {
+    if (json is String) {
+      json = jsonDecode(json);
+    }
+    return Usuario(
+      firestoreId: json['firestoreId'],
+      usuario: json['usuario'],
+      passwordHash: json['passwordHash'],
+      nombre: json['nombre'],
+      email: json['email'],
+      tipo: TipoUsuario.values.firstWhere(
+        (t) => t.name == json['tipo'],
+        orElse: () => TipoUsuario.usuario,
+      ),
+      activo: json['activo'] ?? true,
+      fechaCreacion: DateTime.parse(json['fechaCreacion']),
+      ultimoAcceso: json['ultimoAcceso'] != null ? DateTime.parse(json['ultimoAcceso']) : null,
+    );
+  }
   final String? firestoreId;
   final String usuario;
   final String passwordHash; // Hash de la contraseña, nunca la contraseña en texto plano

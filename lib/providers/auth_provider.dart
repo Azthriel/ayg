@@ -3,6 +3,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/usuario.dart';
 
 class AuthProvider extends ChangeNotifier {
+  AuthProvider() {
+    restoreSession();
+  }
+  // Persistencia para Flutter web
+  Future<void> restoreSession() async {
+    // Usar window.localStorage para Flutter web
+    try {
+      final storage = (WidgetsBinding.instance.platformDispatcher as dynamic).window.localStorage;
+      final usuarioJson = storage['usuarioActual'];
+      if (usuarioJson != null) {
+        final usuario = Usuario.fromJson(usuarioJson);
+        _usuarioActual = usuario;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
   Usuario? _usuarioActual;
   bool _isLoading = false;
   String? _error;
@@ -50,6 +66,12 @@ class AuthProvider extends ChangeNotifier {
 
       _usuarioActual = usuarioEncontrado.copyWith(ultimoAcceso: DateTime.now());
 
+      // Guardar usuario en localStorage (Flutter web)
+      try {
+        final storage = (WidgetsBinding.instance.platformDispatcher as dynamic).window.localStorage;
+        storage['usuarioActual'] = _usuarioActual!.toJson();
+      } catch (_) {}
+
       _setLoading(false);
       notifyListeners();
       return true;
@@ -63,6 +85,11 @@ class AuthProvider extends ChangeNotifier {
   void logout() {
     _usuarioActual = null;
     _clearError();
+    // Eliminar usuario de localStorage (Flutter web)
+    try {
+      final storage = (WidgetsBinding.instance.platformDispatcher as dynamic).window.localStorage;
+      storage.remove('usuarioActual');
+    } catch (_) {}
     notifyListeners();
   }
 

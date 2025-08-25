@@ -95,12 +95,52 @@ class ClienteProvider with ChangeNotifier {
       if (firestoreId != null) {
         final clienteConId = cliente.copyWith(firestoreId: firestoreId);
         _clientes.add(clienteConId);
+        // Crear cuotas automáticamente
+        final List<Cuota> cuotasGeneradas = [];
+        final DateTime fechaInicio = cliente.fechaInicio;
+        final int numeroCuotas = cliente.numeroCuotas;
+        final double montoTotal = cliente.montoTotal;
+        final double montoPrimeraCuota = cliente.montoPrimeraCuota;
+        final double montoPorCuota = numeroCuotas > 0 ? (montoTotal - montoPrimeraCuota) / numeroCuotas : 0.0;
+
+        // 1. Crear cuota de entrega de materiales
+        final cuotaEntrega = Cuota(
+          clienteId: firestoreId,
+          numeroCuota: 1,
+          fechaVencimiento: fechaInicio,
+          monto: montoPrimeraCuota,
+          pagada: false,
+          activo: true,
+          observaciones: '🛠️ Entrega de materiales',
+        );
+        final cuotaEntregaId = await _firestoreService.insertCuota(cuotaEntrega);
+        if (cuotaEntregaId != null) {
+          cuotasGeneradas.add(cuotaEntrega.copyWith(firestoreId: cuotaEntregaId));
+        }
+
+        // 2. Crear cuotas normales
+        for (int i = 0; i < numeroCuotas; i++) {
+          DateTime fechaVencimiento = fechaInicio.add(Duration(days: 30 * (i + 1)));
+          final cuota = Cuota(
+            clienteId: firestoreId,
+            numeroCuota: i + 2,
+            fechaVencimiento: fechaVencimiento,
+            monto: montoPorCuota,
+            pagada: false,
+            activo: true,
+          );
+          final cuotaId = await _firestoreService.insertCuota(cuota);
+          if (cuotaId != null) {
+            cuotasGeneradas.add(cuota.copyWith(firestoreId: cuotaId));
+          }
+        }
+        _cuotas.addAll(cuotasGeneradas);
         notifyListeners();
-        print('Cliente ${cliente.nombre} agregado localmente');
+        print('Cliente ${cliente.nombre} y sus cuotas agregados localmente');
         return true;
       }
     } catch (e) {
-      print('Error al agregar cliente: $e');
+      print('Error al agregar cliente y cuotas: $e');
     } finally {
       _setLoading(false);
     }

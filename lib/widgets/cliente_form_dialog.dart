@@ -365,6 +365,7 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
       initialDate: _fechaInicio,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      locale: const Locale('es'),
     );
 
     if (fecha != null) {
