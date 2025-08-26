@@ -23,6 +23,130 @@ class _ClientesScreenState extends State<ClientesScreen> {
     super.dispose();
   }
 
+  void _confirmarReactivarCliente(BuildContext context, Cliente cliente) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reactivar cliente'),
+        content: const Text('¿Deseas reactivar este cliente?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final provider = Provider.of<ClienteProvider>(
+                context,
+                listen: false,
+              );
+              final actualizado = await provider.actualizarCliente(
+                cliente.copyWith(activo: true),
+              );
+              if (actualizado && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Cliente reactivado')),
+                );
+              }
+            },
+            child: const Text('Reactivar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmarEliminarDefinitivo(BuildContext context, Cliente cliente) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar definitivamente'),
+        content: const Text(
+          'Esta acción eliminará el cliente y sus cuotas de forma permanente. ¿Deseas continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final provider = Provider.of<ClienteProvider>(
+                context,
+                listen: false,
+              );
+              final eliminado = await provider.eliminarClienteCompletamente(
+                cliente.firestoreId!,
+              );
+              if (eliminado && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Cliente eliminado definitivamente'),
+                  ),
+                );
+              }
+            },
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmarEliminarCliente(BuildContext context, Cliente cliente) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Desactivar cliente'),
+        content: Text(
+          '¿Está seguro que desea desactivar al cliente ${cliente.nombre}?\n\n'
+          'El cliente no será eliminado, solo quedará inactivo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final provider = Provider.of<ClienteProvider>(
+                context,
+                listen: false,
+              );
+              final actualizado = await provider.actualizarCliente(
+                cliente.copyWith(activo: false),
+              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      actualizado
+                          ? 'Cliente desactivado exitosamente'
+                          : 'Error al desactivar el cliente',
+                    ),
+                    backgroundColor: actualizado ? Colors.green : Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text(
+              'Desactivar',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ClienteProvider>(
@@ -111,12 +235,26 @@ class _ClientesScreenState extends State<ClientesScreen> {
                               cliente: cliente,
                               onTap: () =>
                                   _mostrarDetalleCliente(context, cliente),
-                              onEdit: () => _mostrarFormularioCliente(
-                                context,
-                                cliente: cliente,
-                              ),
-                              onDelete: () =>
-                                  _confirmarEliminarCliente(context, cliente),
+                              onEdit: () {
+                                if (cliente.activo) {
+                                  _mostrarFormularioCliente(
+                                    context,
+                                    cliente: cliente,
+                                  );
+                                } else {
+                                  _confirmarReactivarCliente(context, cliente);
+                                }
+                              },
+                              onDelete: () {
+                                if (cliente.activo) {
+                                  _confirmarEliminarCliente(context, cliente);
+                                } else {
+                                  _confirmarEliminarDefinitivo(
+                                    context,
+                                    cliente,
+                                  );
+                                }
+                              },
                             );
                           },
                         ),
@@ -189,9 +327,10 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 cliente.numeroCuotas.toString(),
               ),
               _buildInfoRow('Estado:', cliente.activo ? 'Activo' : 'Inactivo'),
-              
+
               // Observaciones del cliente
-              if (cliente.observaciones != null && cliente.observaciones!.isNotEmpty) ...[
+              if (cliente.observaciones != null &&
+                  cliente.observaciones!.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Container(
                   width: double.infinity,
@@ -250,12 +389,26 @@ class _ClientesScreenState extends State<ClientesScreen> {
                     if (provider.isLoading) {
                       return const Center(child: CircularProgressIndicator());
                     }
-
-                    return ListView.builder(
-                      itemCount: provider.cuotas.length,
+                    // Filtrar cuotas del cliente actual
+                    final cuotasCliente = provider.cuotas
+                        .where((c) => c.clienteId == cliente.firestoreId)
+                        .toList();
+                    if (cuotasCliente.isEmpty) {
+                      return const Center(
+                        child: Text('No hay cuotas asociadas a este cliente.'),
+                      );
+                    }
+                    return ListView.separated(
+                      itemCount: cuotasCliente.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
                       itemBuilder: (context, index) {
-                        final cuota = provider.cuotas[index];
+                        final cuota = cuotasCliente[index];
                         return Card(
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: cuota.pagada
@@ -263,11 +416,39 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                   : cuota.estaVencida
                                   ? Colors.red
                                   : Colors.orange,
-                              child: Text(cuota.numeroCuota.toString()),
+                              child: Text(
+                                cuota.numeroCuota.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                            title: Text('Cuota ${cuota.numeroCuota}'),
-                            subtitle: Text(
-                              'Vence: ${cuota.fechaVencimiento.day}/${cuota.fechaVencimiento.month}/${cuota.fechaVencimiento.year}',
+                            title: Text(
+                              'Cuota ${cuota.numeroCuota}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Vence: ${cuota.fechaVencimiento.day}/${cuota.fechaVencimiento.month}/${cuota.fechaVencimiento.year}',
+                                ),
+                                if (cuota.observaciones != null &&
+                                    cuota.observaciones!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      'Obs: ${cuota.observaciones!}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.blueGrey,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             trailing: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -286,6 +467,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                         ? Colors.green
                                         : Colors.red,
                                     fontSize: 12,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
@@ -297,6 +479,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   },
                 ),
               ),
+              SizedBox(height: 16),
             ],
           ),
         ),
@@ -318,54 +501,6 @@ class _ClientesScreenState extends State<ClientesScreen> {
             ),
           ),
           Expanded(child: Text(value)),
-        ],
-      ),
-    );
-  }
-
-  void _confirmarEliminarCliente(BuildContext context, Cliente cliente) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar eliminación'),
-        content: Text(
-          '¿Está seguro que desea eliminar al cliente ${cliente.nombre}?\n\n'
-          'Esta acción también eliminará todas sus cuotas asociadas y no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-
-              final provider = Provider.of<ClienteProvider>(
-                context,
-                listen: false,
-              );
-              final exito = await provider.eliminarCliente(cliente.firestoreId!);
-
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      exito
-                          ? 'Cliente eliminado exitosamente'
-                          : 'Error al eliminar el cliente',
-                    ),
-                    backgroundColor: exito ? Colors.green : Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
         ],
       ),
     );

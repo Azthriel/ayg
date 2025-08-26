@@ -199,7 +199,10 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: usuario.activo ? Colors.red : Colors.green,
             ),
-            child: Text(usuario.activo ? 'Desactivar' : 'Activar'),
+            child: Text(
+              usuario.activo ? 'Desactivar' : 'Activar',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),

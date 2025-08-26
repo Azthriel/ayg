@@ -19,28 +19,57 @@ class ClienteListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      color: cliente.activo ? null : Colors.grey.shade200,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: cliente.activo ? Colors.green : Colors.grey,
-          child: Text(
-            cliente.nombre.isNotEmpty ? cliente.nombre[0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          child: cliente.activo
+              ? Text(
+                  cliente.nombre.isNotEmpty ? cliente.nombre[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : Icon(Icons.block, color: Colors.white),
         ),
-        title: Text(
-          cliente.nombre,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            Text(
+              cliente.nombre,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: cliente.activo ? Colors.black : Colors.grey,
+              ),
+            ),
+            if (!cliente.activo)
+              Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'INACTIVO',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Cliente: ${cliente.numeroCliente}'),
-            Text('Email: ${cliente.email}'),
-            Text('Tel: ${cliente.telefono}'),
-            Text('Cuotas: ${cliente.numeroCuotas} | Total: \$${cliente.montoTotal.toStringAsFixed(2)}'),
+            Text('Cliente: ${cliente.numeroCliente}', style: TextStyle(color: cliente.activo ? Colors.black : Colors.grey)),
+            Text('Email: ${cliente.email}', style: TextStyle(color: cliente.activo ? Colors.black : Colors.grey)),
+            Text('Tel: ${cliente.telefono}', style: TextStyle(color: cliente.activo ? Colors.black : Colors.grey)),
+            Text('Cuotas: ${cliente.numeroCuotas} | Total: \$${cliente.montoTotal.toStringAsFixed(2)}', style: TextStyle(color: cliente.activo ? Colors.black : Colors.grey)),
             if (cliente.observaciones != null && cliente.observaciones!.isNotEmpty) ...[
               const SizedBox(height: 4),
               Container(
@@ -80,16 +109,29 @@ class ClienteListItem extends StatelessWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: onEdit,
-              tooltip: 'Editar',
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: onDelete,
-              tooltip: 'Eliminar',
-            ),
+            if (cliente.activo) ...[
+              IconButton(
+                icon: const Icon(Icons.edit, color: Colors.blue),
+                onPressed: onEdit,
+                tooltip: 'Editar',
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: onDelete,
+                tooltip: 'Eliminar (marcar inactivo)',
+              ),
+            ] else ...[
+              IconButton(
+                icon: const Icon(Icons.restore, color: Colors.green),
+                onPressed: onEdit, // Usar onEdit para reactivar
+                tooltip: 'Reactivar',
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_forever, color: Colors.red),
+                onPressed: onDelete,
+                tooltip: 'Eliminar definitivamente',
+              ),
+            ],
             const Icon(Icons.arrow_forward_ios, size: 16),
           ],
         ),

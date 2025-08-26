@@ -17,14 +17,12 @@ class FirestoreService {
 
   // ===== MÉTODOS PARA CLIENTES =====
 
-  /// Obtiene todos los clientes activos (versión sin índice compuesto)
+  /// Obtiene todos los clientes (activos e inactivos)
   Future<List<Cliente>> getClientes() async {
     print('🔥 ===== getClientes INICIADO =====');
     try {
       print('🔥 Ejecutando query en Firestore...');
-      final querySnapshot = await _clientesCollection
-          .where('activo', isEqualTo: true)
-          .get();
+      final querySnapshot = await _clientesCollection.get();
 
       print('🔥 Documentos encontrados: ${querySnapshot.docs.length}');
 
@@ -41,8 +39,13 @@ class FirestoreService {
         return cliente;
       }).toList();
 
-      // Ordenar por nombre en el cliente
-      clientes.sort((a, b) => a.nombre.compareTo(b.nombre));
+      // Ordenar: activos primero, luego inactivos, ambos por nombre
+      clientes.sort((a, b) {
+        if (a.activo == b.activo) {
+          return a.nombre.compareTo(b.nombre);
+        }
+        return a.activo ? -1 : 1;
+      });
 
       print(
         '🔥 ===== getClientes COMPLETADO - ${clientes.length} clientes =====',
@@ -51,6 +54,26 @@ class FirestoreService {
     } catch (e) {
       print('🔥 ❌ ERROR en getClientes: $e');
       return [];
+    }
+  }
+  /// Elimina un cliente completamente de Firestore (hard delete)
+  Future<bool> deleteClienteCompletamente(String clienteId) async {
+    try {
+      await _clientesCollection.doc(clienteId).delete();
+      // Opcional: eliminar cuotas asociadas
+      final cuotasQuery = await _cuotasCollection
+          .where('clienteId', isEqualTo: clienteId)
+          .get();
+      final batch = _firestore.batch();
+      for (var doc in cuotasQuery.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      print('✅ Cliente y cuotas eliminados completamente');
+      return true;
+    } catch (e) {
+      print('Error eliminando cliente completamente: $e');
+      return false;
     }
   }
 

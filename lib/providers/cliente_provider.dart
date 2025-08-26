@@ -87,6 +87,24 @@ class ClienteProvider with ChangeNotifier {
       _setLoading(false);
     }
   }
+  /// Elimina un cliente completamente (hard delete)
+  Future<bool> eliminarClienteCompletamente(String clienteId) async {
+    _setLoading(true);
+    try {
+      final result = await _firestoreService.deleteClienteCompletamente(clienteId);
+      if (result) {
+        _clientes.removeWhere((c) => c.firestoreId == clienteId);
+        notifyListeners();
+        print('Cliente eliminado completamente de Firestore y UI');
+        return true;
+      }
+    } catch (e) {
+      print('Error al eliminar cliente completamente: $e');
+    } finally {
+      _setLoading(false);
+    }
+    return false;
+  }
 
   Future<bool> agregarCliente(Cliente cliente) async {
     _setLoading(true);
@@ -157,6 +175,17 @@ class ClienteProvider with ChangeNotifier {
     try {
       final result = await _firestoreService.updateCliente(cliente);
       if (result) {
+        // Actualizar cuotas asociadas
+        final cuotasCliente = _cuotas.where((c) => c.clienteId == cliente.firestoreId).toList();
+        for (var cuota in cuotasCliente) {
+          await _firestoreService.updateCuota(cuota.copyWith(activo: cliente.activo));
+        }
+        // Actualizar localmente las cuotas
+        for (var i = 0; i < _cuotas.length; i++) {
+          if (_cuotas[i].clienteId == cliente.firestoreId) {
+            _cuotas[i] = _cuotas[i].copyWith(activo: cliente.activo);
+          }
+        }
         final index = _clientes.indexWhere(
           (c) => c.firestoreId == cliente.firestoreId,
         );
